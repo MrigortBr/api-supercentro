@@ -56,3 +56,26 @@ CREATE TABLE "InstitutionPhoto" (
     REFERENCES "Instituicion" ("id")
     ON DELETE CASCADE
 );
+
+CREATE TABLE "InstitutionEquipment" (
+    "id" SERIAL PRIMARY KEY,
+
+    "id_instituicion" INTEGER NOT NULL,
+
+    "simb" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+
+    "status" TEXT NOT NULL,
+    "marca" TEXT,
+
+    "quantidade" INTEGER NOT NULL DEFAULT 1,
+
+    "previsao_entrega" DATE,
+
+    "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT "FK_INSTITUTION_EQUIPMENT"
+        FOREIGN KEY ("id_instituicion")
+        REFERENCES "Instituicion"("id")
+        ON DELETE CASCADE
+);

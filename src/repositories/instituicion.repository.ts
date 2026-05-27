@@ -8,67 +8,12 @@ export interface InstituicionWithActivities extends Instituicion {
 }
 
 export class InstituicionRepository {
-    async findAll(
-        page: number,
-        limit: number
-    ): Promise<{
-        data: InstituicionWithActivities[];
-        pagination: {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-        };
-    }> {
-        const offset = (page - 1) * limit;
-
-        const institutions = await db<Instituicion>("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
-
-        const ids = institutions.map((item) => item.id);
-
-        const activities = ids.length > 0 ? await db<Activity>("Activities").select("*").whereIn("id_instituicion", ids) : [];
-
-        const data: InstituicionWithActivities[] = institutions.map((institution) => ({
-            ...institution,
-
-            activities: activities.filter((activity) => activity.id_instituicion === institution.id),
-        }));
-
-        const totalResult = await db("Instituicion").count("id as total").first();
-
-        const total = Number(totalResult?.total || 0);
-
-        return {
-            data,
-
-            pagination: {
-                page,
-                limit,
-                total,
-
-                totalPages: Math.ceil(total / limit),
-            },
-        };
-    }
-
-    // =========================================
-    // FIND BY ID
-    // =========================================
-
     async findById(id: number): Promise<InstituicionWithActivities | null> {
-        // =========================
-        // INSTITUTION
-        // =========================
-
         const institution = await db<Instituicion>("Instituicion").where({ id }).first();
 
         if (!institution) {
             return null;
         }
-
-        // =========================
-        // ACTIVITIES
-        // =========================
 
         const activities = await db<Activity>("Activities").select("*").where({
             id_instituicion: id,
@@ -79,10 +24,6 @@ export class InstituicionRepository {
             activities,
         };
     }
-
-    // =========================================
-    // CREATE
-    // =========================================
 
     async create(data: Omit<InstituicionWithActivities, "id">) {
         const trx = await db.transaction();
@@ -123,10 +64,6 @@ export class InstituicionRepository {
             throw error;
         }
     }
-
-    // =========================================
-    // UPDATE
-    // =========================================
 
     async update(id: number, data: Partial<InstituicionWithActivities>) {
         const trx = await db.transaction();
@@ -185,10 +122,6 @@ export class InstituicionRepository {
             throw error;
         }
     }
-
-    // =========================================
-    // DELETE
-    // =========================================
 
     async delete(id: number) {
         const trx = await db.transaction();

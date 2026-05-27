@@ -35,3 +35,24 @@ CREATE TABLE "Activities" (
     REFERENCES "Instituicion" ("id")
     ON DELETE CASCADE
 );
+
+CREATE TABLE "InstitutionPhoto" (
+  "id" SERIAL PRIMARY KEY,
+
+  "id_instituicion" INTEGER NOT NULL,
+
+  "photo" BYTEA NOT NULL,
+
+  "original_name" TEXT,
+
+  "mime_type" TEXT,
+
+  "size" INTEGER,
+
+  "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT "FK_INSTITUTION_PHOTO"
+    FOREIGN KEY ("instituicion_id")
+    REFERENCES "Instituicion" ("id")
+    ON DELETE CASCADE
+);

@@ -8,10 +8,6 @@ export interface InstituicionWithActivities extends Instituicion {
 }
 
 export class InstituicionRepository {
-    // =========================================
-    // FIND ALL
-    // =========================================
-
     async findAll(
         page: number,
         limit: number
@@ -26,37 +22,17 @@ export class InstituicionRepository {
     }> {
         const offset = (page - 1) * limit;
 
-        // =========================
-        // INSTITUTIONS
-        // =========================
-
         const institutions = await db<Instituicion>("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
-
-        // =========================
-        // IDS
-        // =========================
 
         const ids = institutions.map((item) => item.id);
 
-        // =========================
-        // ACTIVITIES
-        // =========================
-
         const activities = ids.length > 0 ? await db<Activity>("Activities").select("*").whereIn("id_instituicion", ids) : [];
-
-        // =========================
-        // RELATIONSHIP
-        // =========================
 
         const data: InstituicionWithActivities[] = institutions.map((institution) => ({
             ...institution,
 
             activities: activities.filter((activity) => activity.id_instituicion === institution.id),
         }));
-
-        // =========================
-        // TOTAL
-        // =========================
 
         const totalResult = await db("Instituicion").count("id as total").first();
 

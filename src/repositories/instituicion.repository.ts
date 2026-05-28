@@ -8,6 +8,50 @@ export interface InstituicionWithActivities extends Instituicion {
 }
 
 export class InstituicionRepository {
+    async findAll(
+        page: number,
+        limit: number
+    ): Promise<{
+        data: InstituicionWithActivities[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+    }> {
+        const offset = (page - 1) * limit;
+
+        const institutions = await db<Instituicion>("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
+
+        const ids = institutions.map((item) => item.id);
+
+        const activities = ids.length > 0 ? await db<Activity>("Activities").select("*").whereIn("id_instituicion", ids) : [];
+
+        const machines = ids.length > 0 ? await db<Activity>("InstitutionEquipment").select("*").whereIn("id_instituicion", ids) : [];
+
+        const data: InstituicionWithActivities[] = institutions.map((institution) => ({
+            ...institution,
+            machine: machines.filter((machine) => machine.id_instituicion === institution.id),
+            activities: activities.filter((activity) => activity.id_instituicion === institution.id),
+        }));
+
+        const totalResult = await db("Instituicion").count("id as total").first();
+
+        const total = Number(totalResult?.total || 0);
+
+        return {
+            data,
+
+            pagination: {
+                page,
+                limit,
+                total,
+
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
     async findById(id: number): Promise<InstituicionWithActivities | null> {
         const institution = await db<Instituicion>("Instituicion").where({ id }).first();
 

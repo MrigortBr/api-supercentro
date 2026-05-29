@@ -1,15 +1,19 @@
 import express from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 
 import instituicionRoutes from "./routes/instituicion.routes";
 import activityRoutes from "./routes/activity.routes";
 import photosRoutes from "./routes/photos.routes";
 import machineRoutes from "./routes/machine.routes";
+import { swaggerSpec } from "./swagger";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get("/", (req, res) => {
     res.json({ Message: "olá mundo" });

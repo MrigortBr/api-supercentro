@@ -72,7 +72,6 @@ export class InstituicionRepository {
 
     async create(data: Omit<InstituicionWithActivities, "id">) {
         const trx = await db.transaction();
-
         try {
             // =========================
             // SEPARATE DATA
@@ -161,6 +160,8 @@ export class InstituicionRepository {
 
                     end_date: activity.end_date == "" ? null : activity.end_date,
 
+                    observation: activity.observation,
+
                     status: activity.status,
 
                     id_instituicion: id,
@@ -168,6 +169,8 @@ export class InstituicionRepository {
 
                 await trx("Activities").insert(activitiesToInsert);
             }
+
+            console.log(activities);
 
             await trx("InstitutionEquipment").where({ id_instituicion: id }).delete();
 

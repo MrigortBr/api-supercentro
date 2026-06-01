@@ -4,6 +4,7 @@ export interface Activity {
     id: number;
     id_instituicion: number;
     name: string;
+    observation?: string;
     responsible: number | null;
     start_date: Date | null | "";
     end_date: Date | null | "";

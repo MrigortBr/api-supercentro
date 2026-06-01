@@ -18,4 +18,5 @@ export interface InstituicionWithActivities {
     observations: string | null;
 
     activities: Activity[];
+    machine?: any[];
 }

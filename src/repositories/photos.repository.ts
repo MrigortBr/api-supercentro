@@ -30,6 +30,6 @@ export class PhotosRepository {
     }
 
     async delete(id: number) {
-        return await db("InstitutionPhoto as i").delete().where("i.id_instituicion", id);
+        return await db("InstitutionPhoto as i").delete().where("i.id", id);
     }
 }

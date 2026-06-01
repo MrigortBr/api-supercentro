@@ -52,6 +52,7 @@ export class PhotosController {
     async delete(req: Request, res: Response) {
         try {
             const { id } = req.params;
+
             const response = await service.delete(Number(id));
 
             return res.status(204).send("Imagem deletada com sucesso");

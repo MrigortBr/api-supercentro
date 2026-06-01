@@ -5,6 +5,7 @@ import { Activity } from "../types/Activities";
 
 export interface InstituicionWithActivities extends Instituicion {
     activities: Activity[];
+    machine?: any[];
 }
 
 export class InstituicionRepository {
@@ -117,7 +118,7 @@ export class InstituicionRepository {
             // SEPARATE DATA
             // =========================
 
-            const { activities = [], id: _id, ...institutionData } = data;
+            const { activities = [], machine = [], id: _id, ...institutionData } = data;
 
             // =========================
             // UPDATE INSTITUTION
@@ -155,6 +156,17 @@ export class InstituicionRepository {
                 }));
 
                 await trx("Activities").insert(activitiesToInsert);
+            }
+
+            await trx("InstitutionEquipment").where({ id_instituicion: id }).delete();
+
+            if (machine.length > 0) {
+                const machinesToInsert = machine.map((m) => ({
+                    ...m,
+                    id_instituicion: id,
+                }));
+
+                await trx("InstitutionEquipment").insert(machinesToInsert);
             }
 
             await trx.commit();

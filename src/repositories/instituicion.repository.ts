@@ -78,7 +78,7 @@ export class InstituicionRepository {
             // SEPARATE DATA
             // =========================
 
-            const { activities = [], ...institutionData } = data;
+            const { activities = [], machine = [], ...institutionData } = data;
 
             // =========================
             // CREATE INSTITUTION
@@ -98,6 +98,16 @@ export class InstituicionRepository {
                 }));
 
                 await trx("Activities").insert(activitiesToInsert);
+            }
+
+            if (machine.length > 0) {
+                const machinesToInsert = machine.map((m) => ({
+                    ...m,
+
+                    id_instituicion: createdInstitution.id,
+                }));
+
+                await trx("InstitutionEquipment").insert(machinesToInsert);
             }
 
             await trx.commit();

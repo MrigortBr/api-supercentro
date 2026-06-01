@@ -5,7 +5,7 @@ export interface Activity {
     id_instituicion: number;
     name: string;
     responsible: number | null;
-    start_date: Date | null;
-    end_date: Date | null;
+    start_date: Date | null | "";
+    end_date: Date | null | "";
     status: ActivityStatus;
 }

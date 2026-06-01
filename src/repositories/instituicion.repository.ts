@@ -93,7 +93,8 @@ export class InstituicionRepository {
             if (activities.length > 0) {
                 const activitiesToInsert = activities.map((activity) => ({
                     ...activity,
-
+                    start_date: activity.start_date == "" ? null : activity.start_date,
+                    end_date: activity.end_date == "" ? null : activity.end_date,
                     id_instituicion: createdInstitution.id,
                 }));
 
@@ -103,7 +104,7 @@ export class InstituicionRepository {
             if (machine.length > 0) {
                 const machinesToInsert = machine.map((m) => ({
                     ...m,
-
+                    previsao_entrega: m.previsao_entrega == "" ? null : m.previsao_entrega,
                     id_instituicion: createdInstitution.id,
                 }));
 
@@ -156,9 +157,9 @@ export class InstituicionRepository {
 
                     responsible: activity.responsible,
 
-                    start_date: activity.start_date,
+                    start_date: activity.start_date == "" ? null : activity.start_date,
 
-                    end_date: activity.end_date,
+                    end_date: activity.end_date == "" ? null : activity.end_date,
 
                     status: activity.status,
 

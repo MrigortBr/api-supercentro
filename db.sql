@@ -38,17 +38,11 @@ CREATE TABLE "Activities" (
 
 CREATE TABLE "InstitutionPhoto" (
   "id" SERIAL PRIMARY KEY,
-
   "id_instituicion" INTEGER NOT NULL,
-
   "photo" BYTEA NOT NULL,
-
   "original_name" TEXT,
-
   "mime_type" TEXT,
-
   "size" INTEGER,
-
   "created_at" TIMESTAMP NOT NULL DEFAULT NOW(),
 
   CONSTRAINT "FK_INSTITUTION_PHOTO"
@@ -72,3 +66,14 @@ CREATE TABLE "InstitutionEquipment" (
         REFERENCES "Instituicion"("id")
         ON DELETE CASCADE
 );
+
+CREATE TABLE "ObservationActivities"(
+    "id" SERIAL PRIMARY KEY,
+    "id_activities" INTEGER NOT NULL,
+    "date_observation" TIMESTAMP,
+    "text_observation" TEXT,
+        CONSTRAINT "FK_OBSERVATION_ACTIVITIES"
+        FOREIGN KEY ("id_activities")
+        REFERENCES "Activities"("id")
+        ON DELETE CASCADE
+)

@@ -1,7 +1,7 @@
 import { db } from "../config/database";
 
 import { Instituicion } from "../types/instituicion";
-import { Activity } from "../types/Activities";
+import { Activity, ObservationActivities } from "../types/Activities";
 
 export interface InstituicionWithActivities extends Instituicion {
     activities: Activity[];
@@ -25,16 +25,30 @@ export class InstituicionRepository {
 
         const institutions = await db<Instituicion>("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
 
-        const ids = institutions.map((item) => item.id);
+        const institutionIds = institutions.map((item) => item.id);
 
-        const activities = ids.length > 0 ? await db<Activity>("Activities").select("*").whereIn("id_instituicion", ids) : [];
+        const activities =
+            institutionIds.length > 0
+                ? await db<Omit<Activity, "observation">>("Activities").select("*").whereIn("id_instituicion", institutionIds)
+                : [];
 
-        const machines = ids.length > 0 ? await db<Activity>("InstitutionEquipment").select("*").whereIn("id_instituicion", ids) : [];
+        const activityIds = activities.map((activity) => activity.id);
+
+        const observations =
+            activityIds.length > 0 ? await db<ObservationActivities>("ObservationActivities").select("*").whereIn("id_activities", activityIds) : [];
+
+        const machines =
+            institutionIds.length > 0 ? await db<Activity>("InstitutionEquipment").select("*").whereIn("id_instituicion", institutionIds) : [];
+
+        const activitiesWithObservations: Activity[] = activities.map((activity) => ({
+            ...activity,
+            observation: observations.filter((obs) => obs.id_activities === activity.id),
+        }));
 
         const data: InstituicionWithActivities[] = institutions.map((institution) => ({
             ...institution,
             machine: machines.filter((machine) => machine.id_instituicion === institution.id),
-            activities: activities.filter((activity) => activity.id_instituicion === institution.id),
+            activities: activitiesWithObservations.filter((activity) => activity.id_instituicion === institution.id),
         }));
 
         const totalResult = await db("Instituicion").count("id as total").first();
@@ -43,26 +57,59 @@ export class InstituicionRepository {
 
         return {
             data,
-
             pagination: {
                 page,
                 limit,
                 total,
-
                 totalPages: Math.ceil(total / limit),
             },
         };
     }
+
     async findById(id: number): Promise<InstituicionWithActivities | null> {
         const institution = await db<Instituicion>("Instituicion").where({ id }).first();
 
         if (!institution) {
             return null;
         }
+        const activitiesRaw = await db("Activities")
+            .select("Activities.*", "o.id as observation_id", "o.id_activities", "o.date_observation", "o.text_observation")
+            .where({
+                id_instituicion: id,
+            })
+            .leftJoin("ObservationActivities as o", "o.id_activities", "Activities.id");
 
-        const activities = await db<Activity>("Activities").select("*").where({
-            id_instituicion: id,
-        });
+        const activitiesMap = new Map<number, Activity>();
+
+        for (const row of activitiesRaw) {
+            let activity = activitiesMap.get(row.id);
+
+            if (!activity) {
+                activity = {
+                    id: row.id,
+                    id_instituicion: row.id_instituicion,
+                    name: row.name,
+                    responsible: row.responsible,
+                    start_date: row.start_date,
+                    end_date: row.end_date,
+                    status: row.status,
+                    observation: [],
+                };
+
+                activitiesMap.set(row.id, activity);
+            }
+
+            if (row.observation_id) {
+                (activity.observation ??= []).push({
+                    id: row.observation_id,
+                    id_activities: row.id_activities,
+                    date_observation: row.date_observation,
+                    text_observation: row.text_observation,
+                });
+            }
+        }
+
+        const activities = [...activitiesMap.values()];
 
         return {
             ...institution,
@@ -72,38 +119,39 @@ export class InstituicionRepository {
 
     async create(data: Omit<InstituicionWithActivities, "id">) {
         const trx = await db.transaction();
+
         try {
-            // =========================
-            // SEPARATE DATA
-            // =========================
-
             const { activities = [], machine = [], ...institutionData } = data;
-
-            // =========================
-            // CREATE INSTITUTION
-            // =========================
 
             const [createdInstitution] = await trx("Instituicion").insert(institutionData).returning("*");
 
-            // =========================
-            // CREATE ACTIVITIES
-            // =========================
+            for (const activity of activities) {
+                const { observation = [], ...activityData } = activity;
 
-            if (activities.length > 0) {
-                const activitiesToInsert = activities.map((activity) => ({
-                    ...activity,
-                    start_date: activity.start_date == "" ? null : activity.start_date,
-                    end_date: activity.end_date == "" ? null : activity.end_date,
-                    id_instituicion: createdInstitution.id,
-                }));
+                const [createdActivity] = await trx("Activities")
+                    .insert({
+                        ...activityData,
+                        start_date: activity.start_date === "" ? null : activity.start_date,
+                        end_date: activity.end_date === "" ? null : activity.end_date,
+                        id_instituicion: createdInstitution.id,
+                    })
+                    .returning("*");
 
-                await trx("Activities").insert(activitiesToInsert);
+                if (observation.length > 0) {
+                    await trx("ObservationActivities").insert(
+                        observation.map((obs) => ({
+                            id_activities: createdActivity.id,
+                            date_observation: obs.date_observation,
+                            text_observation: obs.text_observation,
+                        }))
+                    );
+                }
             }
 
             if (machine.length > 0) {
                 const machinesToInsert = machine.map((m) => ({
                     ...m,
-                    previsao_entrega: m.previsao_entrega == "" ? null : m.previsao_entrega,
+                    previsao_entrega: m.previsao_entrega === "" ? null : m.previsao_entrega,
                     id_instituicion: createdInstitution.id,
                 }));
 
@@ -115,30 +163,16 @@ export class InstituicionRepository {
             return await this.findById(createdInstitution.id);
         } catch (error) {
             await trx.rollback();
-
             throw error;
         }
     }
 
     async update(id: number, data: Partial<InstituicionWithActivities>) {
         const trx = await db.transaction();
-
         try {
-            // =========================
-            // SEPARATE DATA
-            // =========================
-
             const { activities = [], machine = [], id: _id, ...institutionData } = data;
 
-            // =========================
-            // UPDATE INSTITUTION
-            // =========================
-
             await trx("Instituicion").where({ id }).update(institutionData);
-
-            // =========================
-            // REMOVE OLD ACTIVITIES
-            // =========================
 
             await trx("Activities")
                 .where({
@@ -146,28 +180,27 @@ export class InstituicionRepository {
                 })
                 .delete();
 
-            // =========================
-            // INSERT NEW ACTIVITIES
-            // =========================
+            for (const activity of activities) {
+                const { observation = [], ...activityData } = activity;
 
-            if (activities.length > 0) {
-                const activitiesToInsert = activities.map((activity) => ({
-                    name: activity.name,
+                const [createdActivity] = await trx("Activities")
+                    .insert({
+                        ...activityData,
+                        start_date: activity.start_date === "" ? null : activity.start_date,
+                        end_date: activity.end_date === "" ? null : activity.end_date,
+                        id_instituicion: id,
+                    })
+                    .returning("*");
 
-                    responsible: activity.responsible,
-
-                    start_date: activity.start_date == "" ? null : activity.start_date,
-
-                    end_date: activity.end_date == "" ? null : activity.end_date,
-
-                    observation: activity.observation,
-
-                    status: activity.status,
-
-                    id_instituicion: id,
-                }));
-
-                await trx("Activities").insert(activitiesToInsert);
+                if (observation.length > 0) {
+                    await trx("ObservationActivities").insert(
+                        observation.map((obs) => ({
+                            id_activities: createdActivity.id,
+                            date_observation: obs.date_observation,
+                            text_observation: obs.text_observation,
+                        }))
+                    );
+                }
             }
 
             await trx("InstitutionEquipment").where({ id_instituicion: id }).delete();
@@ -175,6 +208,7 @@ export class InstituicionRepository {
             if (machine.length > 0) {
                 const machinesToInsert = machine.map((m) => ({
                     ...m,
+                    previsao_entrega: m.previsao_entrega === "" ? null : m.previsao_entrega,
                     id_instituicion: id,
                 }));
 
@@ -186,7 +220,6 @@ export class InstituicionRepository {
             return await this.findById(id);
         } catch (error) {
             await trx.rollback();
-
             throw error;
         }
     }

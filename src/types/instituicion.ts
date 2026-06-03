@@ -1,4 +1,4 @@
-import { Activity } from "./Activities";
+import { Activity, ActivityStatus } from "./Activities";
 
 export interface Instituicion {
     id: number;
@@ -6,6 +6,7 @@ export interface Instituicion {
     state: string;
     responsible: string;
     status: string;
+    datepreview?: Date;
     observations: string | null;
 }
 

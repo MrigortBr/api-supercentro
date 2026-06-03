@@ -170,8 +170,6 @@ export class InstituicionRepository {
                 await trx("Activities").insert(activitiesToInsert);
             }
 
-            console.log(activities);
-
             await trx("InstitutionEquipment").where({ id_instituicion: id }).delete();
 
             if (machine.length > 0) {

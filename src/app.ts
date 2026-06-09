@@ -4,7 +4,7 @@ import swaggerUi from "swagger-ui-express";
 
 import instituicionRoutes from "./routes/instituicion.routes";
 import activityRoutes from "./routes/activity.routes";
-import photosRoutes from "./routes/photos.routes";
+import authRoutes from "./routes/auth.routes";
 import machineRoutes from "./routes/machine.routes";
 import { swaggerSpec } from "./swagger";
 
@@ -21,7 +21,9 @@ app.get("/", (req, res) => {
 
 app.use("/instituicion", instituicionRoutes);
 app.use("/activities", activityRoutes);
-app.use("/photos", photosRoutes);
-app.use("/machine", machineRoutes);
+app.use("/auth", authRoutes);
+
+// app.use("/photos", photosRoutes);
+// app.use("/machine", machineRoutes);
 
 export default app;

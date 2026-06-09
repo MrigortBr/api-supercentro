@@ -3,7 +3,15 @@ import { db } from "../config/database";
 import { Instituicion } from "../types/instituicion";
 import { Activity, ObservationActivities } from "../types/Activities";
 
-export interface InstituicionWithActivities extends Instituicion {
+export interface InstitutionObservation {
+    id?: number;
+    institution_id?: number;
+    description: string;
+    created_at?: Date;
+}
+
+export interface InstituicionWithActivities extends Omit<Instituicion, "observations"> {
+    observations: InstitutionObservation[];
     activities: Activity[];
     machine?: any[];
 }
@@ -23,9 +31,14 @@ export class InstituicionRepository {
     }> {
         const offset = (page - 1) * limit;
 
-        const institutions = await db<Instituicion>("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
+        const institutions = await db("Instituicion").select("*").limit(limit).offset(offset).orderBy("id", "desc");
 
         const institutionIds = institutions.map((item) => item.id);
+
+        const institutionObservations =
+            institutionIds.length > 0
+                ? await db<InstitutionObservation>("InstituicionObservation").select("*").whereIn("institution_id", institutionIds)
+                : [];
 
         const activities =
             institutionIds.length > 0
@@ -37,8 +50,7 @@ export class InstituicionRepository {
         const observations =
             activityIds.length > 0 ? await db<ObservationActivities>("ObservationActivities").select("*").whereIn("id_activities", activityIds) : [];
 
-        const machines =
-            institutionIds.length > 0 ? await db<Activity>("InstitutionEquipment").select("*").whereIn("id_instituicion", institutionIds) : [];
+        const machines = institutionIds.length > 0 ? await db("InstitutionEquipment").select("*").whereIn("id_instituicion", institutionIds) : [];
 
         const activitiesWithObservations: Activity[] = activities.map((activity) => ({
             ...activity,
@@ -47,7 +59,11 @@ export class InstituicionRepository {
 
         const data: InstituicionWithActivities[] = institutions.map((institution) => ({
             ...institution,
+
+            observations: institutionObservations.filter((obs) => obs.institution_id === institution.id),
+
             machine: machines.filter((machine) => machine.id_instituicion === institution.id),
+
             activities: activitiesWithObservations.filter((activity) => activity.id_instituicion === institution.id),
         }));
 
@@ -67,11 +83,18 @@ export class InstituicionRepository {
     }
 
     async findById(id: number): Promise<InstituicionWithActivities | null> {
-        const institution = await db<Instituicion>("Instituicion").where({ id }).first();
+        const institution = await db("Instituicion").where({ id }).first();
 
         if (!institution) {
             return null;
         }
+
+        const institutionObservations = await db<InstitutionObservation>("InstituicionObservation")
+            .where({
+                institution_id: id,
+            })
+            .orderBy("created_at", "desc");
+
         const activitiesRaw = await db("Activities")
             .select("Activities.*", "o.id as observation_id", "o.id_activities", "o.date_observation", "o.text_observation")
             .where({
@@ -111,8 +134,14 @@ export class InstituicionRepository {
 
         const activities = [...activitiesMap.values()];
 
+        const machines = await db("InstitutionEquipment").where({
+            id_instituicion: id,
+        });
+
         return {
             ...institution,
+            observations: institutionObservations,
+            machine: machines,
             activities,
         };
     }
@@ -121,9 +150,18 @@ export class InstituicionRepository {
         const trx = await db.transaction();
 
         try {
-            const { activities = [], machine = [], ...institutionData } = data;
+            const { activities = [], machine = [], observations = [], ...institutionData } = data;
 
             const [createdInstitution] = await trx("Instituicion").insert(institutionData).returning("*");
+
+            if (observations.length > 0) {
+                await trx("InstituicionObservation").insert(
+                    observations.map((obs) => ({
+                        institution_id: createdInstitution.id,
+                        description: obs.description,
+                    }))
+                );
+            }
 
             for (const activity of activities) {
                 const { observation = [], ...activityData } = activity;
@@ -169,10 +207,26 @@ export class InstituicionRepository {
 
     async update(id: number, data: Partial<InstituicionWithActivities>) {
         const trx = await db.transaction();
+
         try {
-            const { activities = [], machine = [], id: _id, ...institutionData } = data;
+            const { activities = [], machine = [], observations = [], id: _id, ...institutionData } = data;
 
             await trx("Instituicion").where({ id }).update(institutionData);
+
+            await trx("InstituicionObservation")
+                .where({
+                    institution_id: id,
+                })
+                .delete();
+
+            if (observations.length > 0) {
+                await trx("InstituicionObservation").insert(
+                    observations.map((obs) => ({
+                        institution_id: id,
+                        description: obs.description,
+                    }))
+                );
+            }
 
             await trx("Activities")
                 .where({
@@ -203,7 +257,11 @@ export class InstituicionRepository {
                 }
             }
 
-            await trx("InstitutionEquipment").where({ id_instituicion: id }).delete();
+            await trx("InstitutionEquipment")
+                .where({
+                    id_instituicion: id,
+                })
+                .delete();
 
             if (machine.length > 0) {
                 const machinesToInsert = machine.map((m) => ({
@@ -228,19 +286,23 @@ export class InstituicionRepository {
         const trx = await db.transaction();
 
         try {
-            // =========================
-            // DELETE ACTIVITIES
-            // =========================
-
             await trx("Activities")
                 .where({
                     id_instituicion: id,
                 })
                 .delete();
 
-            // =========================
-            // DELETE INSTITUTION
-            // =========================
+            await trx("InstituicionObservation")
+                .where({
+                    institution_id: id,
+                })
+                .delete();
+
+            await trx("InstitutionEquipment")
+                .where({
+                    id_instituicion: id,
+                })
+                .delete();
 
             await trx("Instituicion").where({ id }).delete();
 
@@ -249,7 +311,6 @@ export class InstituicionRepository {
             return true;
         } catch (error) {
             await trx.rollback();
-
             throw error;
         }
     }

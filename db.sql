@@ -36,6 +36,18 @@ CREATE TABLE "Activities" (
     ON DELETE CASCADE
 );
 
+CREATE TABLE "InstituicionObservation" (
+  "id" SERIAL PRIMARY KEY,
+  "institution_id" INTEGER NOT NULL,
+  "description" TEXT NOT NULL,
+  "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_institution_observation
+    FOREIGN KEY ("institution_id")
+    REFERENCES "Instituicion"("id")
+    ON DELETE CASCADE
+);
+
 CREATE TABLE "InstitutionPhoto" (
   "id" SERIAL PRIMARY KEY,
   "id_instituicion" INTEGER NOT NULL,
